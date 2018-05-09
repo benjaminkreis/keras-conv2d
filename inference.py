@@ -63,12 +63,13 @@ conv_b = h5File['/conv2d_1/conv2d_1/bias:0'][()]
 dense_k = h5File['/dense_1/dense_1/kernel:0'][()]
 dense_b = h5File['/dense_1/dense_1/bias:0'][()]
 
+print "conv_k shape:",conv_k.shape
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
 
 ### Get a sample
-#print x_train.shape
-#print y_train.shape
+print x_train.shape
+print y_train.shape
 x_sample = x_train[0,:,:]
 y_sample = y_train[0]
 
@@ -87,7 +88,7 @@ padding = "same";
 # Derived
 
 f_inchann  = in_chann;  #number of input channels
-
+n_filters  = f_outchann;
 
 # Padding
 
@@ -123,19 +124,53 @@ print("in_height, post padding, should be: {}".format(in_height))
 #f1 = open('pre.txt', 'w')
 #np.savetxt(f1,x_sample)
 x_sample = np.pad(x_sample, [(pad_top,pad_bottom),(pad_left,pad_right)], 'constant')
+print "x_sample shape: ",x_sample.shape
 #f2 = open('post.txt', 'w')
 #np.savetxt(f2,x_sample)
 
+
+conv_out = np.zeros((out_height,out_width,n_filters))
+
+
 n_mult = 0
 n_add = 0
-for ow in range(0, out_width):
-    for oh in range(0, out_height):
+for oh in range(0, out_height):
+    for ow in range(0, out_width):
         for f in range(0, f_outchann):
             channel_sum = 0;
             for c in range(0, in_chann):
-                
-                #data is f_width*f_height
-                #filt is f_width*f_height
+
+                #count multiplications
                 n_mult = n_mult + f_width*f_height
+
+                #get filter
+                my_filter = conv_k[:,:,c,f]
                 
+                #select data
+                x_buffer = x_sample #would select channel if available
+                x_buffer = x_buffer[oh*stride_height:oh*stride_height+f_height,ow*stride_width:ow*stride_width+f_width]
+
+                #do multiplication
+                my_mult = np.multiply(x_buffer, my_filter);
                 
+                #sum
+                my_dot = np.sum(my_mult)
+                channel_sum += my_dot
+
+                if ow==0 and oh==0 and f==0 and c==0:
+                    print "buffer shape: ",x_buffer.shape
+                    print "filter shape: ",my_filter.shape
+                    print "mult shape: ",my_mult.shape
+                    print "dot shape: ",my_dot.shape
+                    print "channel sum shape: ",channel_sum.shape
+
+        conv_out[oh,ow,f] = channel_sum + conv_b[f]
+
+
+#Rest of network
+conv_out = conv_out * (conv_out > 0) #relu
+conv_out = conv_out.flatten()
+print "flattened shape: ",conv_out.shape
+dnn_out = np.dot(conv_out, dense_k)+dense_b
+dnn_out = np.exp(dnn_out) / sum(np.exp(dnn_out)) #softmax
+print "Network output: ",dnn_out

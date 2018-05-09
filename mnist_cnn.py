@@ -48,7 +48,7 @@ y_test = keras.utils.to_categorical(y_test, num_classes)
 
 model = Sequential()
 model.add(Conv2D(4, kernel_size=(3, 3),
-                 activation='relu',
+                 activation='relu',padding='same',
                  input_shape=input_shape))
 #model.add(Conv2D(64, (3, 3), activation='relu'))
 #model.add(MaxPooling2D(pool_size=(2, 2)))
@@ -81,4 +81,10 @@ with outfile:
     obj = json.loads(jsonString)
     json.dump(obj, outfile, sort_keys=True,indent=4, separators=(',', ': '))
     outfile.write('\n')
+
+for i in range(0,10):
+    print(y_train[i])
+    print(model.predict(x_train[i:i+1]))
+    print('\n')
+
 
