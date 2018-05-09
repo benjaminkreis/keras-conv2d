@@ -46,6 +46,8 @@ print(x_test.shape[0], 'test samples')
 y_train = keras.utils.to_categorical(y_train, num_classes)
 y_test = keras.utils.to_categorical(y_test, num_classes)
 
+
+#Setup model
 model = Sequential()
 model.add(Conv2D(4, kernel_size=(3, 3),
                  activation='relu',padding='same',
@@ -62,18 +64,23 @@ model.compile(loss=keras.losses.categorical_crossentropy,
               optimizer=keras.optimizers.Adadelta(),
               metrics=['accuracy'])
 
+
+#Train
 model.fit(x_train, y_train,
           batch_size=batch_size,
           epochs=epochs,
           verbose=1,
           validation_data=(x_test, y_test))
+
+
+#Performance
 score = model.evaluate(x_test, y_test, verbose=0)
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 
 
+#Export
 model.save_weights('my_model_weights.h5')
-
 outfile = open('model.json','wb')
 jsonString = model.to_json()
 import json
@@ -82,6 +89,8 @@ with outfile:
     json.dump(obj, outfile, sort_keys=True,indent=4, separators=(',', ': '))
     outfile.write('\n')
 
+
+#Run a few predictions
 for i in range(0,10):
     print(y_train[i])
     print(model.predict(x_train[i:i+1]))
