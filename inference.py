@@ -5,6 +5,8 @@ import h5py
 import math
 import numpy as np
 
+import keras
+from keras import backend as K
 from keras.datasets import mnist
 
 
@@ -65,13 +67,44 @@ dense_b = h5File['/dense_1/dense_1/bias:0'][()]
 
 print "conv_k shape:",conv_k.shape
 
+num_classes = 10
+
+# input image dimensions
+img_rows, img_cols = 28, 28
+
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
 
+if K.image_data_format() == 'channels_first':
+    x_train = x_train.reshape(x_train.shape[0], 1, img_rows, img_cols)
+    x_test = x_test.reshape(x_test.shape[0], 1, img_rows, img_cols)
+    input_shape = (1, img_rows, img_cols)
+else:
+    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
+    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+    input_shape = (img_rows, img_cols, 1)
+
+x_train = x_train.astype('float32')
+x_test = x_test.astype('float32')
+x_train /= 255
+x_test /= 255
+print 'x_train shape: ',x_train.shape
+print 'y_train shape: ',y_train.shape
+print 'train samples: ',x_train.shape[0]
+print 'test samples: ',x_test.shape[0]
+
+# convert class vectors to binary class matrices
+y_train = keras.utils.to_categorical(y_train, num_classes)
+y_test = keras.utils.to_categorical(y_test, num_classes)
+
+
 ### Get a sample
-print x_train.shape
-print y_train.shape
-x_sample = x_train[0,:,:]
+x_sample = x_train[0,:,:,:]
 y_sample = y_train[0]
+print 'x_sample shape: ',x_sample.shape
+print 'y_sample shape: ',y_sample.shape
+
+f0 = open('inference_input.txt', 'w')
+np.savetxt(f0,x_train[0:1,:,:,:].flatten())
 
 in_height = 28;
 in_width  = 28;
@@ -117,16 +150,15 @@ if padding == "same":
     in_width = in_width + pad_left + pad_right
     in_height = in_height + pad_top + pad_bottom
 
-print("in_width, post padding, should be: {}".format(in_width))
-print("in_height, post padding, should be: {}".format(in_height))
+    print("in_width, post padding, should be: {}".format(in_width))
+    print("in_height, post padding, should be: {}".format(in_height))
 
-
-#f1 = open('pre.txt', 'w')
-#np.savetxt(f1,x_sample)
-x_sample = np.pad(x_sample, [(pad_top,pad_bottom),(pad_left,pad_right)], 'constant')
-print "x_sample shape: ",x_sample.shape
-#f2 = open('post.txt', 'w')
-#np.savetxt(f2,x_sample)
+    #f1 = open('pre.txt', 'w')
+    #np.savetxt(f1,x_sample)
+    x_sample = np.pad(x_sample, [(pad_top,pad_bottom),(pad_left,pad_right),(0,0)], 'constant')
+    print "x_sample shape: ",x_sample.shape
+    #f2 = open('post.txt', 'w')
+    #np.savetxt(f2,x_sample)
 
 
 conv_out = np.zeros((out_height,out_width,n_filters))
@@ -136,7 +168,7 @@ n_mult = 0
 n_add = 0
 for oh in range(0, out_height):
     for ow in range(0, out_width):
-        for f in range(0, f_outchann):
+        for f in range(0, f_outchann): #n_filters
             channel_sum = 0;
             for c in range(0, in_chann):
 
@@ -147,7 +179,7 @@ for oh in range(0, out_height):
                 my_filter = conv_k[:,:,c,f]
                 
                 #select data
-                x_buffer = x_sample #would select channel if available
+                x_buffer = x_sample[:,:,c]
                 x_buffer = x_buffer[oh*stride_height:oh*stride_height+f_height,ow*stride_width:ow*stride_width+f_width]
 
                 #do multiplication
@@ -157,19 +189,27 @@ for oh in range(0, out_height):
                 my_dot = np.sum(my_mult)
                 channel_sum += my_dot
 
-                if ow==0 and oh==0 and f==0 and c==0:
+                #if ow==0 and oh==0 and f==0 and c==0:
+                if np.sum(x_buffer)>0 :
                     print "buffer shape: ",x_buffer.shape
                     print "filter shape: ",my_filter.shape
                     print "mult shape: ",my_mult.shape
                     print "dot shape: ",my_dot.shape
                     print "channel sum shape: ",channel_sum.shape
-
-        conv_out[oh,ow,f] = channel_sum + conv_b[f]
-
+                    print "buffer : ",x_buffer
+                    print "filter : ",my_filter
+                    print "mult : ",my_mult
+                    print "dot : ",my_dot
+                    print "channel sum : ",channel_sum
+                    
+            conv_out[oh,ow,f] = channel_sum + conv_b[f]
+            #print "conv_out[oh,ow,f] ",conv_out[oh,ow,f]
 
 #Rest of network
 conv_out = conv_out * (conv_out > 0) #relu
 conv_out = conv_out.flatten()
+f3 = open('inference.txt', 'w')
+np.savetxt(f3, conv_out)
 print "flattened shape: ",conv_out.shape
 dnn_out = np.dot(conv_out, dense_k)+dense_b
 dnn_out = np.exp(dnn_out) / sum(np.exp(dnn_out)) #softmax

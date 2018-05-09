@@ -14,6 +14,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 from keras import backend as K
+import numpy as np
 
 batch_size = 128
 num_classes = 10
@@ -91,9 +92,21 @@ with outfile:
 
 
 #Run a few predictions
-for i in range(0,10):
-    print(y_train[i])
-    print(model.predict(x_train[i:i+1]))
-    print('\n')
+#for i in range(0,10):
+#    print(y_train[i])
+#    print(model.predict(x_train[i:i+1]))
+#    print('\n')
 
 
+
+
+#Split up
+modelc = Sequential()
+modelc.add(Conv2D(4, kernel_size=(3, 3),
+                 activation='relu',padding='same',
+                 input_shape=input_shape))
+modelc.load_weights('my_model_weights.h5',by_name=True)
+f0 = open('model_input.txt', 'w')
+np.savetxt(f0,x_train[0:1].flatten())
+f1 = open('model.txt', 'w')
+np.savetxt(f1, modelc.predict(x_train[0:1]).flatten())
