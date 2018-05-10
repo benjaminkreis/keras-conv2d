@@ -16,6 +16,7 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras import backend as K
 import numpy as np
 
+n_kernels = 1
 batch_size = 128
 num_classes = 10
 epochs = 1
@@ -50,8 +51,9 @@ y_test = keras.utils.to_categorical(y_test, num_classes)
 
 #Setup model
 model = Sequential()
-model.add(Conv2D(4, kernel_size=(3, 3),
+model.add(Conv2D(n_kernels, kernel_size=(3, 3),
                  activation='relu',padding='same',
+                 use_bias=True,
                  input_shape=input_shape))
 #model.add(Conv2D(64, (3, 3), activation='relu'))
 #model.add(MaxPooling2D(pool_size=(2, 2)))
@@ -92,21 +94,14 @@ with outfile:
 
 
 #Run a few predictions
-#for i in range(0,10):
-#    print(y_train[i])
-#    print(model.predict(x_train[i:i+1]))
-#    print('\n')
+for i in range(0,3):
+    print(y_train[i])
+    print(model.predict(x_train[i:i+1]))
+    print('\n')
 
 
 
 
-#Split up
-modelc = Sequential()
-modelc.add(Conv2D(4, kernel_size=(3, 3),
-                 activation='relu',padding='same',
-                 input_shape=input_shape))
-modelc.load_weights('my_model_weights.h5',by_name=True)
+#Debug output
 f0 = open('model_input.txt', 'w')
 np.savetxt(f0,x_train[0:1].flatten())
-f1 = open('model.txt', 'w')
-np.savetxt(f1, modelc.predict(x_train[0:1]).flatten())

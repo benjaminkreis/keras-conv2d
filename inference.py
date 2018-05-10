@@ -46,12 +46,11 @@ def print_hdf5_item_structure(g, offset='    ') :
 ## Look at h5
 ################
 
-h5File = h5py.File('my_model_weights.h5')
-
 # Print h5 contents
 #for item in h5File.attrs.keys():
 #    print(item + ":", h5File.attrs[item])
 
+h5File = h5py.File('my_model_weights.h5')
 print_hdf5_file_structure('my_model_weights.h5')
     
 
@@ -112,7 +111,7 @@ in_chann  = 1;
 
 f_height   = 3;
 f_width    = 3;
-f_outchann = 4;         #number of filters  
+f_outchann = 1; #number of filters  
 
 stride_width = 1;
 stride_height = 1;
@@ -189,8 +188,8 @@ for oh in range(0, out_height):
                 my_dot = np.sum(my_mult)
                 channel_sum += my_dot
 
-                #if ow==0 and oh==0 and f==0 and c==0:
-                if np.sum(x_buffer)>0 :
+                if ow==0 and oh==0 and f==0 and c==0:
+                    #if np.sum(x_buffer)>0 :
                     print "buffer shape: ",x_buffer.shape
                     print "filter shape: ",my_filter.shape
                     print "mult shape: ",my_mult.shape
@@ -201,16 +200,54 @@ for oh in range(0, out_height):
                     print "mult : ",my_mult
                     print "dot : ",my_dot
                     print "channel sum : ",channel_sum
-                    
+
+            print "conv_b[f] ",conv_b[f]
             conv_out[oh,ow,f] = channel_sum + conv_b[f]
             #print "conv_out[oh,ow,f] ",conv_out[oh,ow,f]
 
+
+print "conv_out shape: ",conv_out.shape
+
 #Rest of network
 conv_out = conv_out * (conv_out > 0) #relu
-conv_out = conv_out.flatten()
+
 f3 = open('inference.txt', 'w')
-np.savetxt(f3, conv_out)
+np.savetxt(f3, conv_out[:,:,0].flatten())
+
+conv_out = conv_out.flatten()
 print "flattened shape: ",conv_out.shape
 dnn_out = np.dot(conv_out, dense_k)+dense_b
 dnn_out = np.exp(dnn_out) / sum(np.exp(dnn_out)) #softmax
 print "Network output: ",dnn_out
+
+
+#Only the Conv2d part of Keras
+
+n_kernels = 1
+
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Flatten
+from keras.layers import Conv2D, MaxPooling2D
+
+modelc = Sequential()
+modelc.add(Conv2D(n_kernels, kernel_size=(3, 3),
+                 activation='relu',padding='same',
+                 input_shape=input_shape))
+modelc.load_weights('my_model_weights.h5',by_name=True)
+print("conv_out shape: ",modelc.predict(x_train[0:1]).shape)
+
+fc = open('model.txt', 'w')
+np.savetxt(fc, modelc.predict(x_train[0:1])[0,:,:,0].flatten())
+
+modelc.save_weights('my_modelc_weights.h5')
+outfile = open('modelc.json','wb')
+jsonString = modelc.to_json()
+import json
+with outfile:
+    obj = json.loads(jsonString)
+    json.dump(obj, outfile, sort_keys=True,indent=4, separators=(',', ': '))
+    outfile.write('\n')
+
+h5File = h5py.File('my_modelc_weights.h5')
+print_hdf5_file_structure('my_modelc_weights.h5')
+
