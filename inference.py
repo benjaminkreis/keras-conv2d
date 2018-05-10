@@ -201,7 +201,7 @@ for oh in range(0, out_height):
                     print "dot : ",my_dot
                     print "channel sum : ",channel_sum
 
-            print "conv_b[f] ",conv_b[f]
+            #print "conv_b[f] ",conv_b[f]
             conv_out[oh,ow,f] = channel_sum + conv_b[f]
             #print "conv_out[oh,ow,f] ",conv_out[oh,ow,f]
 
@@ -221,33 +221,33 @@ dnn_out = np.exp(dnn_out) / sum(np.exp(dnn_out)) #softmax
 print "Network output: ",dnn_out
 
 
-#Only the Conv2d part of Keras
-
-n_kernels = 1
-
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Flatten
-from keras.layers import Conv2D, MaxPooling2D
-
-modelc = Sequential()
-modelc.add(Conv2D(n_kernels, kernel_size=(3, 3),
-                 activation='relu',padding='same',
-                 input_shape=input_shape))
-modelc.load_weights('my_model_weights.h5',by_name=True)
-print("conv_out shape: ",modelc.predict(x_train[0:1]).shape)
-
-fc = open('model.txt', 'w')
-np.savetxt(fc, modelc.predict(x_train[0:1])[0,:,:,0].flatten())
-
-modelc.save_weights('my_modelc_weights.h5')
-outfile = open('modelc.json','wb')
-jsonString = modelc.to_json()
-import json
-with outfile:
-    obj = json.loads(jsonString)
-    json.dump(obj, outfile, sort_keys=True,indent=4, separators=(',', ': '))
-    outfile.write('\n')
-
-h5File = h5py.File('my_modelc_weights.h5')
-print_hdf5_file_structure('my_modelc_weights.h5')
-
+#Only the Conv2d part of Keras (for debugging)
+def conv_only_keras():
+    n_kernels = 1
+    
+    from keras.models import Sequential
+    from keras.layers import Dense, Dropout, Flatten
+    from keras.layers import Conv2D, MaxPooling2D
+    
+    modelc = Sequential()
+    modelc.add(Conv2D(n_kernels, kernel_size=(3, 3),
+                      activation='relu',padding='same',
+                      input_shape=input_shape))
+    modelc.load_weights('my_model_weights.h5',by_name=True)
+    print("conv_out shape: ",modelc.predict(x_train[0:1]).shape)
+    
+    fc = open('model.txt', 'w')
+    np.savetxt(fc, modelc.predict(x_train[0:1])[0,:,:,0].flatten())
+    
+    modelc.save_weights('my_modelc_weights.h5')
+    outfile = open('modelc.json','wb')
+    jsonString = modelc.to_json()
+    import json
+    with outfile:
+        obj = json.loads(jsonString)
+        json.dump(obj, outfile, sort_keys=True,indent=4, separators=(',', ': '))
+        outfile.write('\n')
+        
+        h5File = h5py.File('my_modelc_weights.h5')
+        print_hdf5_file_structure('my_modelc_weights.h5')
+        
