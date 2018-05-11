@@ -10,6 +10,58 @@ from keras import backend as K
 from keras.datasets import mnist
 
 
+def print_array_to_cpp(name, a, odir ):
+
+    #count zeros
+    zero_ctr = 0
+    for x in np.nditer(a, order='C'):
+        if x == 0: 
+            zero_ctr += 1
+
+    #put output in subdir for tarballing later
+    f=open("{}/firmware/weights/{}.h".format(odir,name),"w")
+
+    #meta data
+    f.write("//Numpy array shape {}\n".format(a.shape))
+    f.write("//Min {}\n".format(np.min(a)))
+    f.write("//Max {}\n".format(np.max(a)))
+    f.write("//Number of zeros {}\n".format(zero_ctr))
+    f.write("\n")
+    
+    #c++ variable 
+    if "w" in name: 
+        f.write("weight_default_t {}".format(name))
+    elif "b" in name: 
+        f.write("bias_default_t {}".format(name))
+    else:
+        raise Exception('ERROR: Unkown weights type')
+
+    #hls doesn't like 3d arrays... unrolling to 1d
+    if len(a.shape)>=3: 
+        f.write("[{}]".format(np.prod(a.shape)))
+    else:
+        for x in a.shape:
+            f.write("[{}]".format(x))
+    f.write(" = {")
+    
+    #fill c++ array.  
+    #not including internal brackets for multidimensional case
+    i=0
+    for x in np.nditer(a, order='C'):
+        if i==0:
+            f.write("{}".format(x))
+        else:
+            f.write(", {}".format(x))
+        i=i+1
+    f.write("};\n")
+    f.close()
+
+    return zero_ctr;
+
+
+
+
+
 # The following two functions from
 # https://confluence.slac.stanford.edu/display/PSDM/How+to+access+HDF5+data+from+Python
 
@@ -40,6 +92,41 @@ def print_hdf5_item_structure(g, offset='    ') :
             subg = val
             print offset, key, #,"   ", subg.name #, val, subg.len(), type(subg),
             print_hdf5_item_structure(subg, offset + '    ')
+
+
+
+#Only the Conv2d part of Keras (for debugging)
+def conv_only_keras():
+    n_kernels = 2
+    
+    from keras.models import Sequential
+    from keras.layers import Dense, Dropout, Flatten
+    from keras.layers import Conv2D, MaxPooling2D
+    
+    modelc = Sequential()
+    modelc.add(Conv2D(n_kernels, kernel_size=(3, 3),
+                      activation='relu',padding='same',
+                      input_shape=input_shape))
+    modelc.load_weights('my_model_weights.h5',by_name=True)
+    print("conv_out shape: ",modelc.predict(x_train[0:1]).shape)
+    
+    fc = open('model.txt', 'w')
+    np.savetxt(fc, modelc.predict(x_train[0:1])[0,:,:,:].flatten())
+    
+    modelc.save_weights('my_modelc_weights.h5')
+    outfile = open('modelc.json','wb')
+    jsonString = modelc.to_json()
+    import json
+    with outfile:
+        obj = json.loads(jsonString)
+        json.dump(obj, outfile, sort_keys=True,indent=4, separators=(',', ': '))
+        outfile.write('\n')
+        
+        h5File = h5py.File('my_modelc_weights.h5')
+        print_hdf5_file_structure('my_modelc_weights.h5')
+        
+
+
             
 
 ################
@@ -64,6 +151,11 @@ conv_b = h5File['/conv2d_1/conv2d_1/bias:0'][()]
 dense_k = h5File['/dense_1/dense_1/kernel:0'][()]
 dense_b = h5File['/dense_1/dense_1/bias:0'][()]
 
+print_array_to_cpp("w1",conv_k,"weights")
+print_array_to_cpp("b1",conv_b,"weights")
+print_array_to_cpp("w2",dense_k,"weights")
+print_array_to_cpp("b2",dense_b,"weights")
+
 print "conv_k shape:",conv_k.shape
 
 num_classes = 10
@@ -86,6 +178,13 @@ x_train = x_train.astype('float32')
 x_test = x_test.astype('float32')
 x_train /= 255
 x_test /= 255
+
+#Shrink for small FPGA test
+img_rows, img_cols = 8, 8
+x_train = x_train[:,10:18,10:18,:]
+x_test = x_test[:,10:18,10:18,:]
+input_shape = (8,8,1)
+
 print 'x_train shape: ',x_train.shape
 print 'y_train shape: ',y_train.shape
 print 'train samples: ',x_train.shape[0]
@@ -102,16 +201,18 @@ y_sample = y_train[0]
 print 'x_sample shape: ',x_sample.shape
 print 'y_sample shape: ',y_sample.shape
 
+print_array_to_cpp("w_in",x_sample,"weights")
+
 f0 = open('inference_input.txt', 'w')
 np.savetxt(f0,x_train[0:1,:,:,:].flatten())
 
-in_height = 28;
-in_width  = 28;
-in_chann  = 1; 
+in_height = input_shape[0];
+in_width  = input_shape[1];
+in_chann  = input_shape[2]; 
 
 f_height   = 3;
 f_width    = 3;
-f_outchann = 1; #number of filters  
+f_outchann = 2; #number of filters  
 
 stride_width = 1;
 stride_height = 1;
@@ -205,49 +306,30 @@ for oh in range(0, out_height):
             conv_out[oh,ow,f] = channel_sum + conv_b[f]
             #print "conv_out[oh,ow,f] ",conv_out[oh,ow,f]
 
-
+print "n_mult: ",n_mult
 print "conv_out shape: ",conv_out.shape
+
+print_array_to_cpp("w_out",conv_out,"weights")
 
 #Rest of network
 conv_out = conv_out * (conv_out > 0) #relu
 
 f3 = open('inference.txt', 'w')
-np.savetxt(f3, conv_out[:,:,0].flatten())
+np.savetxt(f3, conv_out[:,:,:].flatten())
 
 conv_out = conv_out.flatten()
 print "flattened shape: ",conv_out.shape
 dnn_out = np.dot(conv_out, dense_k)+dense_b
+
+f4 = open('dense.txt', 'w')
+np.savetxt(f4, dnn_out)
+print "Pre-softmax: ",dnn_out
+
 dnn_out = np.exp(dnn_out) / sum(np.exp(dnn_out)) #softmax
 print "Network output: ",dnn_out
 
+print_array_to_cpp("w_final_out",dnn_out,"weights")
 
-#Only the Conv2d part of Keras (for debugging)
-def conv_only_keras():
-    n_kernels = 1
-    
-    from keras.models import Sequential
-    from keras.layers import Dense, Dropout, Flatten
-    from keras.layers import Conv2D, MaxPooling2D
-    
-    modelc = Sequential()
-    modelc.add(Conv2D(n_kernels, kernel_size=(3, 3),
-                      activation='relu',padding='same',
-                      input_shape=input_shape))
-    modelc.load_weights('my_model_weights.h5',by_name=True)
-    print("conv_out shape: ",modelc.predict(x_train[0:1]).shape)
-    
-    fc = open('model.txt', 'w')
-    np.savetxt(fc, modelc.predict(x_train[0:1])[0,:,:,0].flatten())
-    
-    modelc.save_weights('my_modelc_weights.h5')
-    outfile = open('modelc.json','wb')
-    jsonString = modelc.to_json()
-    import json
-    with outfile:
-        obj = json.loads(jsonString)
-        json.dump(obj, outfile, sort_keys=True,indent=4, separators=(',', ': '))
-        outfile.write('\n')
-        
-        h5File = h5py.File('my_modelc_weights.h5')
-        print_hdf5_file_structure('my_modelc_weights.h5')
-        
+conv_only_keras()
+
+

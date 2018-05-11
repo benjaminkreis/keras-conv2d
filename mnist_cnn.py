@@ -16,7 +16,7 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras import backend as K
 import numpy as np
 
-n_kernels = 1
+n_kernels = 2
 batch_size = 128
 num_classes = 10
 epochs = 1
@@ -43,6 +43,11 @@ x_test /= 255
 print('x_train shape:', x_train.shape)
 print(x_train.shape[0], 'train samples')
 print(x_test.shape[0], 'test samples')
+
+#Shrink for small FPGA test
+x_train = x_train[:,10:18,10:18,:]
+x_test = x_test[:,10:18,10:18,:]
+input_shape = (8,8,1)
 
 # convert class vectors to binary class matrices
 y_train = keras.utils.to_categorical(y_train, num_classes)
