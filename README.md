@@ -2,7 +2,7 @@
 
 ## Description
 
-Code for training and evaluating 2D convolutional neural network with Keras.  Use multiple channels and filters to explore conv1d options for [HLS4ML project](https://github.com/hls-fpga-machine-learning/keras-training).
+Code for training and evaluating 2D convolutional neural network with Keras as test for [hls4ml project](https://github.com/hls-fpga-machine-learning/HLS4ML).
 
 This code just uses the Keras MNIST handwritten digits example.  inference.py implements the inference by hand as a test before writing code for FPGAs. 
 
