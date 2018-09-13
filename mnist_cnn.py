@@ -12,7 +12,7 @@ import keras
 from keras.datasets import mnist
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten
-from keras.layers import Conv2D, MaxPooling2D
+from keras.layers import Conv2D, MaxPooling2D, BatchNormalization
 from keras import backend as K
 import numpy as np
 
@@ -62,6 +62,7 @@ model.add(Conv2D(n_kernels, kernel_size=(3, 3),
                  input_shape=input_shape))
 #model.add(Conv2D(64, (3, 3), activation='relu'))
 #model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(BatchNormalization())
 model.add(Dropout(0.25))
 model.add(Flatten())
 #model.add(Dense(32, activation='relu'))
@@ -89,7 +90,7 @@ print('Test accuracy:', score[1])
 
 #Export
 model.save_weights('my_model_weights.h5')
-outfile = open('model.json','wb')
+outfile = open('model.json', "w", encoding="utf8")
 jsonString = model.to_json()
 import json
 with outfile:
